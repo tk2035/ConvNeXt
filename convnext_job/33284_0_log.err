@@ -1,0 +1,16 @@
+submitit ERROR (2024-08-09 19:49:22,577) - Submitted job triggered an exception
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\harip\AppData\Local\Programs\Python\Python312\Lib\site-packages\submitit\core\_submit.py", line 11, in <module>
+    submitit_main()
+  File "C:\Users\harip\AppData\Local\Programs\Python\Python312\Lib\site-packages\submitit\core\submission.py", line 71, in submitit_main
+    process_job(args.folder)
+  File "C:\Users\harip\AppData\Local\Programs\Python\Python312\Lib\site-packages\submitit\core\submission.py", line 64, in process_job
+    raise error
+  File "C:\Users\harip\AppData\Local\Programs\Python\Python312\Lib\site-packages\submitit\core\submission.py", line 52, in process_job
+    env._handle_signals(paths, delayed)
+  File "C:\Users\harip\AppData\Local\Programs\Python\Python312\Lib\site-packages\submitit\core\job_environment.py", line 133, in _handle_signals
+    signal.signal(signal.SIGUSR1, handler.checkpoint_and_try_requeue)
+                  ^^^^^^^^^^^^^^
+AttributeError: module 'signal' has no attribute 'SIGUSR1'

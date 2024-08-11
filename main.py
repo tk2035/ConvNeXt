@@ -1,7 +1,5 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
-
 # All rights reserved.
-
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
@@ -17,20 +15,28 @@ import json
 import os
 
 from pathlib import Path
-
 from timm.data.mixup import Mixup
 from timm.models import create_model
 from timm.loss import LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
-from timm.utils import ModelEma
+from timm.utils import ModelEmaV2
 from optim_factory import create_optimizer, LayerDecayValueAssigner
-
 from datasets import build_dataset
 from engine import train_one_epoch, evaluate
-
 from utils import NativeScalerWithGradNormCount as NativeScaler
 import utils
 import models.convnext
 import models.convnext_isotropic
+
+
+local_rank = int(os.getenv("LOCAL_RANK", 0))
+# torch.cuda.set_device(local_rank)
+# device = torch.device("cuda", local_rank) if torch.cuda.is_available() else torch.device("cpu")
+if torch.cuda.is_available():
+    torch.cuda.set_device(local_rank)
+    device = torch.device("cuda", local_rank)
+else:
+    device = torch.device("cpu")
+
 
 def str2bool(v):
     """
@@ -308,12 +314,12 @@ def main(args):
         utils.load_state_dict(model, checkpoint_model, prefix=args.model_prefix)
     model.to(device)
 
-    model_ema = None
+    # model_ema = None
     if args.model_ema:
         # Important to create EMA model after cuda(), DP wrapper, and AMP but before SyncBN and DDP wrapper
-        model_ema = ModelEma(
+        model_ema1 = ModelEmaV2(
             model,
-            decay=args.model_ema_decay,
+            decay=0.9999,
             device='cpu' if args.model_ema_force_cpu else '',
             resume='')
         print("Using EMA with decay = %.8f" % args.model_ema_decay)
@@ -359,7 +365,7 @@ def main(args):
         args.lr, args.min_lr, args.epochs, num_training_steps_per_epoch,
         warmup_epochs=args.warmup_epochs, warmup_steps=args.warmup_steps,
     )
-
+    
     if args.weight_decay_end is None:
         args.weight_decay_end = args.weight_decay
     wd_schedule_values = utils.cosine_scheduler(
@@ -378,7 +384,9 @@ def main(args):
 
     utils.auto_load_model(
         args=args, model=model, model_without_ddp=model_without_ddp,
-        optimizer=optimizer, loss_scaler=loss_scaler, model_ema=model_ema)
+        optimizer=optimizer, loss_scaler=loss_scaler, model_ema=ModelEmaV2(
+            model,
+            decay=0.9999))
 
     if args.eval:
         print(f"Eval only mode")
@@ -401,7 +409,7 @@ def main(args):
             wandb_logger.set_steps()
         train_stats = train_one_epoch(
             model, criterion, data_loader_train, optimizer,
-            device, epoch, loss_scaler, args.clip_grad, model_ema, mixup_fn,
+            device, epoch, loss_scaler, args.clip_grad, ModelEmaV2(model, decay=0.9999), mixup_fn,
             log_writer=log_writer, wandb_logger=wandb_logger, start_steps=epoch * num_training_steps_per_epoch,
             lr_schedule_values=lr_schedule_values, wd_schedule_values=wd_schedule_values,
             num_training_steps_per_epoch=num_training_steps_per_epoch, update_freq=args.update_freq,
@@ -432,6 +440,22 @@ def main(args):
                          **{f'test_{k}': v for k, v in test_stats.items()},
                          'epoch': epoch,
                          'n_parameters': n_parameters}
+            
+            # Initialize model_ema to None by default
+            model_ema = None
+            
+            if args.model_ema:
+                # Important to create EMA model after cuda(), DP wrapper, and AMP but before SyncBN and DDP wrapper
+                model_ema = ModelEmaV2(
+                    model,
+                    decay=args.model_ema_decay,
+                    device='cpu' if args.model_ema_force_cpu else '',
+                    resume=''
+                )
+                print("Using EMA with decay = %.8f" % args.model_ema_decay)
+
+# Proceed with the rest of the main function, ensuring that `model_ema` is passed to functions appropriately
+
 
             # repeat testing routines for EMA, if ema eval is turned on
             if args.model_ema and args.model_ema_eval:
