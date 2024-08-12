@@ -428,7 +428,7 @@ def main(args):
                 if args.output_dir and args.save_ckpt:
                     utils.save_model(
                         args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
-                        loss_scaler=loss_scaler, epoch="best", model_ema=model_ema)
+                        loss_scaler=loss_scaler, epoch="best", model_ema=ModelEmaV2(model, decay=0.9999))
             print(f'Max accuracy: {max_accuracy:.2f}%')
 
             if log_writer is not None:
@@ -466,7 +466,7 @@ def main(args):
                     if args.output_dir and args.save_ckpt:
                         utils.save_model(
                             args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
-                            loss_scaler=loss_scaler, epoch="best-ema", model_ema=model_ema)
+                            loss_scaler=loss_scaler, epoch="best-ema", model_ema=ModelEmaV2(model, decay=0.9999))
                     print(f'Max EMA accuracy: {max_accuracy_ema:.2f}%')
                 if log_writer is not None:
                     log_writer.update(test_acc1_ema=test_stats_ema['acc1'], head="perf", step=epoch)

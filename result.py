@@ -34,6 +34,19 @@ def preprocess_image(image_path):
     image = image.unsqueeze(0)  # Add batch dimension
     return image
 
+def preprocess_data(data_path):
+    
+    transform = transforms.Compose([
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
+    data = Image.open(data_path).convert("RGB")
+    data = transform(data)
+    data = data.unsqueeze(0)  # Add batch dimension
+    return data
+
 def predict_image(model, image_tensor):
     if model is None:
         print("Model loading failed, cannot make prediction.")
@@ -43,19 +56,37 @@ def predict_image(model, image_tensor):
         outputs = model(image_tensor)
         _, predicted = outputs.max(1)
         return predicted.item()
+    
+def predict_outcome(model, data_tensor):
+    if model is None:
+        print("Model loading failed, cannot make prediction.")
+        return None
+    
+    with torch.no_grad():
+        outputs = model(data_tensor)
+        _, predicted = outputs.max(1)
+        return predicted.item()
 
 if __name__ == "__main__":
     checkpoint_path = 'C:/TEJA/Results/checkpoint-best.pth'
-    image_path = 'C:/TEJA/DataSet/271.jpg'
+    image_path = 'C:/TEJA/DataSet/2663.jpg'
 
-    # Adjust 'model_name' to match the model used in the original training if known
     model = load_model(checkpoint_path, model_name='resnet50')
     
     if model:
         image_tensor = preprocess_image(image_path)
-        prediction = predict_image(model, image_tensor)
+        img_prediction = predict_image(model, image_tensor)
+        data_tensor = preprocess_data(image_path)
+        data_prediction = predict_outcome(model, data_tensor)
 
-        if prediction == 1:
+        if img_prediction == 1:
             print("Prediction: COVID Positive")
-        else:
+            if data_prediction == 1:
+                print("Prediction: The person is likely to die within the next 6 months.")
+            elif data_prediction < 1 or data_prediction > 1:
+                print("Prediction: The person is unlikely to die within the next 6 months.")
+
+        elif img_prediction < 1 or img_prediction > 1:
             print("Prediction: COVID Negative")
+    
+        
